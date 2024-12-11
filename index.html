@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>휘매쓰 연산 챌린지!</title>
+<style>
+    body {
+        font-family: 'Arial', sans-serif;
+        background: #f0f0f0;
+        margin: 0;
+        padding: 0;
+    }
+    .container {
+        width: 80%;
+        margin: 0 auto;
+        text-align: center;
+        padding-top: 50px;
+    }
+    h1 {
+        font-size: 2.5em;
+        margin-bottom: 20px;
+        color: #333;
+    }
+    .difficulty-select {
+        margin-bottom: 40px;
+    }
+    button {
+        padding: 10px 20px;
+        font-size: 1em;
+        margin: 5px;
+        cursor: pointer;
+        border: none;
+        border-radius: 5px;
+    }
+    .difficulty-select button {
+        background: #007acc;
+        color: #fff;
+    }
+    #quiz-container {
+        display: none;
+    }
+    .problem {
+        margin: 20px 0;
+        font-size: 1.2em;
+    }
+    .score, .lives, .global-time {
+        font-size: 1.2em;
+        margin: 10px 0;
+    }
+    .answer-input {
+        margin-top: 20px;
+    }
+    .answer-input input {
+        font-size: 1.2em;
+        padding: 5px;
+        width: 100px;
+        text-align: center;
+    }
+    .answer-input button {
+        background: #28a745;
+        color: #fff;
+    }
+    #energy-bar-container {
+        width: 100%;
+        height: 30px;
+        background: #ccc;
+        position: relative;
+        margin: 20px 0;
+        border-radius: 5px;
+        overflow: hidden;
+        display: inline-block;
+        vertical-align: middle;
+    }
+    #energy-bar {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(to right, #4caf50, #8bc34a);
+        transition: width 0.5s linear;
+    }
+    /* 팝업 스타일 */
+    .popup-background {
+        position: fixed;
+        top:0; left:0;
+        width:100%; height:100%;
+        background: rgba(0,0,0,0.5);
+        display:none;
+        justify-content: center;
+        align-items: center;
+    }
+    .popup {
+        background:#fff;
+        padding:20px;
+        border-radius:10px;
+        max-width: 80%;
+        max-height: 80%;
+        overflow:auto;
+        text-align:center;
+    }
+    .popup h2 {
+        margin-top:0;
+    }
+    .popup button {
+        margin-top: 20px;
+        background:#dc3545;
+        color:#fff;
+    }
+    .reward-popup {
+        background:#fff;
+        padding:20px;
+        border-radius:10px;
+        position:fixed;
+        top:50%;left:50%;
+        transform:translate(-50%,-50%);
+        display:none;
+        z-index:9999;
+        text-align:center;
+    }
+    .reward-popup button {
+        margin-top:20px;
+        background:#007acc;
+        color:#fff;
+    }
+</style>
+<!-- MathJax 라이브러리 로드 -->
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+</head>
+<body>
+
+<div class="container">
+    <h1>휘매쓰 연산 챌린지!</h1>
+    <div class="difficulty-select">
+        <p>난이도를 선택하세요</p>
+        <button data-diff="top">최상</button>
+        <button data-diff="high">상</button>
+        <button data-diff="mid">중</button>
+        <button data-diff="low">하</button>
+    </div>
+    <div id="quiz-container">
+        <div class="global-time">총 경과시간: <span id="global-timer">0</span>초</div>
+        <div class="score">점수: <span id="score">0</span></div>
+        <div class="lives">남은 기회: <span id="lives">3</span></div>
+        <div class="problem" id="problem"></div>
+        <div id="energy-bar-container" style="display:none;"><div id="energy-bar"></div></div>
+        <div class="answer-input">
+            <input type="text" id="answer" placeholder="정답입력" />
+            <button id="submit-answer">제출</button>
+        </div>
+    </div>
+</div>
+
+<div class="popup-background" id="explanation-popup-bg">
+    <div class="popup" id="explanation-popup">
+        <h2>풀이</h2>
+        <div id="explanation-content"></div>
+        <button id="close-popup">닫기</button>
+    </div>
+</div>
+
+<div class="reward-popup" id="reward-popup">
+    <h2 id="reward-title"></h2>
+    <p id="reward-message"></p>
+    <button id="reward-close">닫기</button>
+</div>
+
+<script>
+// 문제 데이터 (문제, 풀이, 정답)
+// 각 문제를 LaTeX로 변환
+// 곱하기는 \\times, 나누기는 \\div 로
+// 예: 345 + 289 - 150 × 2  => $$345 + 289 - 150 \\times 2$$
+// 단, 모든 문제는 괄호 포함 등 그대로 LaTeX 표시.
+var problems = [
+    {
+        problem: "$$345 + 289 - 150 \\times 2$$",
+        explanation: "150 \\times 2 = 300\\,\\Rightarrow\\,345 + 289 = 634\\,\\Rightarrow\\,634 - 300 = 334",
+        answer: 334
+    },
+    {
+        problem: "$$(500 - 125) \\div 5 + 60$$",
+        explanation: "500 - 125 = 375\\,\\Rightarrow\\,375 \\div 5 = 75\\,\\Rightarrow\\,75 + 60 = 135",
+        answer: 135
+    },
+    {
+        problem: "$$120 \\times 3 + 450 \\div 9$$",
+        explanation: "120 \\times 3 = 360\\,\\Rightarrow\\,450 \\div 9 = 50\\,\\Rightarrow\\,360 + 50 = 410",
+        answer: 410
+    },
+    {
+        problem: "$$600 \\div (25 + 5) \\times 4$$",
+        explanation: "25 + 5 = 30\\,\\Rightarrow\\,600 \\div 30 = 20\\,\\Rightarrow\\,20 \\times 4 = 80",
+        answer: 80
+    },
+    {
+        problem: "$$(800 - 200) \\div 4 + 150$$",
+        explanation: "800 - 200 = 600\\,\\Rightarrow\\,600 \\div 4 = 150\\,\\Rightarrow\\,150 + 150 = 300",
+        answer: 300
+    },
+    {
+        problem: "$$45 \\times 12 - 300 \\div 5$$",
+        explanation: "45 \\times 12 = 540\\,\\Rightarrow\\,300 \\div 5 = 60\\,\\Rightarrow\\,540 - 60 = 480",
+        answer: 480
+    },
+    {
+        problem: "$$(150 + 350) \\times 2 - 400$$",
+        explanation: "150 + 350 = 500\\,\\Rightarrow\\,500 \\times 2 = 1000\\,\\Rightarrow\\,1000 - 400 = 600",
+        answer: 600
+    },
+    {
+        problem: "$$720 \\div 8 + 150 \\times 3$$",
+        explanation: "720 \\div 8 = 90\\,\\Rightarrow\\,150 \\times 3 = 450\\,\\Rightarrow\\,90 + 450 = 540",
+        answer: 540
+    },
+    {
+        problem: "$$(500 - 150) \\div 10 \\times 5$$",
+        explanation: "500 - 150 = 350\\,\\Rightarrow\\,350 \\div 10 = 35\\,\\Rightarrow\\,35 \\times 5 = 175",
+        answer: 175
+    },
+    {
+        problem: "$$250 \\times 4 - (300 \\div 6 + 50)$$",
+        explanation: "300 \\div 6 = 50\\,\\Rightarrow\\,50 + 50 = 100\\,\\Rightarrow\\,250 \\times 4 = 1000\\,\\Rightarrow\\,1000 - 100 = 900",
+        answer: 900
+    },
+    {
+        problem: "$$(1000 - 250) \\div 5 + 80$$",
+        explanation: "1000 - 250 = 750\\,\\Rightarrow\\,750 \\div 5 = 150\\,\\Rightarrow\\,150 + 80 = 230",
+        answer: 230
+    },
+    {
+        problem: "$$350 + 450 \\div 9 \\times 3$$",
+        explanation: "450 \\div 9 = 50\\,\\Rightarrow\\,50 \\times 3 = 150\\,\\Rightarrow\\,350 + 150 = 500",
+        answer: 500
+    },
+    {
+        problem: "$$(600 \\div 4) + (200 \\times 3)$$",
+        explanation: "600 \\div 4 = 150\\,\\Rightarrow\\,200 \\times 3 = 600\\,\\Rightarrow\\,150 + 600 = 750",
+        answer: 750
+    },
+    {
+        problem: "$$800 - (120 \\times 5) \\div 3$$",
+        explanation: "120 \\times 5 = 600\\,\\Rightarrow\\,600 \\div 3 = 200\\,\\Rightarrow\\,800 - 200 = 600",
+        answer: 600
+    },
+    {
+        problem: "$$(450 + 150) \\times 2 \\div 5$$",
+        explanation: "450 + 150 = 600\\,\\Rightarrow\\,600 \\times 2 = 1200\\,\\Rightarrow\\,1200 \\div 5 = 240",
+        answer: 240
+    },
+    {
+        problem: "$$500 \\div (25 + 25) \\times 10$$",
+        explanation: "25 + 25 = 50\\,\\Rightarrow\\,500 \\div 50 = 10\\,\\Rightarrow\\,10 \\times 10 = 100",
+        answer: 100
+    },
+    {
+        problem: "$$(700 - 200) \\times 3 + 150$$",
+        explanation: "700 - 200 = 500\\,\\Rightarrow\\,500 \\times 3 = 1500\\,\\Rightarrow\\,1500 + 150 = 1650",
+        answer: 1650
+    },
+    {
+        problem: "$$600 \\div 12 + 80 \\times 4$$",
+        explanation: "600 \\div 12 = 50\\,\\Rightarrow\\,80 \\times 4 = 320\\,\\Rightarrow\\,50 + 320 = 370",
+        answer: 370
+    },
+    {
+        problem: "$$(900 - 300) \\div 6 + 75$$",
+        explanation: "900 - 300 = 600\\,\\Rightarrow\\,600 \\div 6 = 100\\,\\Rightarrow\\,100 + 75 = 175",
+        answer: 175
+    },
+    {
+        problem: "$$150 \\times 5 - 450 \\div 9$$",
+        explanation: "150 \\times 5 = 750\\,\\Rightarrow\\,450 \\div 9 = 50\\,\\Rightarrow\\,750 - 50 = 700",
+        answer: 700
+    },
+    {
+        problem: "$$(400 + 200) \\times 2 \\div 8$$",
+        explanation: "400 + 200 = 600\\,\\Rightarrow\\,600 \\times 2 = 1200\\,\\Rightarrow\\,1200 \\div 8 = 150",
+        answer: 150
+    },
+    {
+        problem: "$$800 \\div (40 \\div 2) + 100$$",
+        explanation: "40 \\div 2 = 20\\,\\Rightarrow\\,800 \\div 20 = 40\\,\\Rightarrow\\,40 + 100 = 140",
+        answer: 140
+    },
+    {
+        problem: "$$(500 - 100) \\times 4 + 250 \\div 5$$",
+        explanation: "500 - 100 = 400\\,\\Rightarrow\\,400 \\times 4 = 1600\\,\\Rightarrow\\,250 \\div 5 = 50\\,\\Rightarrow\\,1600 + 50 = 1650",
+        answer: 1650
+    },
+    {
+        problem: "$$300 \\div 5 \\times (6 + 4)$$",
+        explanation: "6 + 4 = 10\\,\\Rightarrow\\,300 \\div 5 = 60\\,\\Rightarrow\\,60 \\times 10 = 600",
+        answer: 600
+    },
+    {
+        problem: "$$(250 + 350) \\div 10 \\times 4$$",
+        explanation: "250 + 350 = 600\\,\\Rightarrow\\,600 \\div 10 = 60\\,\\Rightarrow\\,60 \\times 4 = 240",
+        answer: 240
+    },
+    {
+        problem: "$$450 - 150 \\times 2 + 300 \\div 3$$",
+        explanation: "150 \\times 2 = 300\\,\\Rightarrow\\,300 \\div 3 = 100\\,\\Rightarrow\\,450 - 300 = 150\\,\\Rightarrow\\,150 + 100 = 250",
+        answer: 250
+    },
+    {
+        problem: "$$(600 \\div 3) + (200 \\times 2)$$",
+        explanation: "600 \\div 3 = 200\\,\\Rightarrow\\,200 \\times 2 = 400\\,\\Rightarrow\\,200 + 400 = 600",
+        answer: 600
+    },
+    {
+        problem: "$$700 - (250 \\times 2) \\div 5$$",
+        explanation: "250 \\times 2 = 500\\,\\Rightarrow\\,500 \\div 5 = 100\\,\\Rightarrow\\,700 - 100 = 600",
+        answer: 600
+    },
+    {
+        problem: "$$(800 + 200) \\div 10 \\times 5$$",
+        explanation: "800 + 200 = 1000\\,\\Rightarrow\\,1000 \\div 10 = 100\\,\\Rightarrow\\,100 \\times 5 = 500",
+        answer: 500
+    },
+    {
+        problem: "$$500 \\div (50 \\div 2) + 100$$",
+        explanation: "50 \\div 2 = 25\\,\\Rightarrow\\,500 \\div 25 = 20\\,\\Rightarrow\\,20 + 100 = 120",
+        answer: 120
+    },
+    {
+        problem: "$$(300 + 200) \\times 3 - 400 \\div 4$$",
+        explanation: "300 + 200 = 500\\,\\Rightarrow\\,500 \\times 3 = 1500\\,\\Rightarrow\\,400 \\div 4 = 100\\,\\Rightarrow\\,1500 - 100 = 1400",
+        answer: 1400
+    },
+    {
+        problem: "$$600 \\div 6 + 250 \\times 2$$",
+        explanation: "600 \\div 6 = 100\\,\\Rightarrow\\,250 \\times 2 = 500\\,\\Rightarrow\\,100 + 500 = 600",
+        answer: 600
+    },
+    {
+        problem: "$$(900 - 300) \\div 5 + 200$$",
+        explanation: "900 - 300 = 600\\,\\Rightarrow\\,600 \\div 5 = 120\\,\\Rightarrow\\,120 + 200 = 320",
+        answer: 320
+    },
+    {
+        problem: "$$200 \\times 4 - 500 \\div 10$$",
+        explanation: "200 \\times 4 = 800\\,\\Rightarrow\\,500 \\div 10 = 50\\,\\Rightarrow\\,800 - 50 = 750",
+        answer: 750
+    },
+    {
+        problem: "$$(400 + 100) \\times 2 \\div 5$$",
+        explanation: "400 + 100 = 500\\,\\Rightarrow\\,500 \\times 2 = 1000\\,\\Rightarrow\\,1000 \\div 5 = 200",
+        answer: 200
+    },
+    {
+        problem: "$$700 \\div (35 \\div 5) + 150$$",
+        explanation: "35 \\div 5 = 7\\,\\Rightarrow\\,700 \\div 7 = 100\\,\\Rightarrow\\,100 + 150 = 250",
+        answer: 250
+    },
+    {
+        problem: "$$(500 - 100) \\times 3 + 300 \\div 6$$",
+        explanation: "500 - 100 = 400\\,\\Rightarrow\\,400 \\times 3 = 1200\\,\\Rightarrow\\,300 \\div 6 = 50\\,\\Rightarrow\\,1200 + 50 = 1250",
+        answer: 1250
+    },
+    {
+        problem: "$$800 \\div 8 + 200 \\times 3$$",
+        explanation: "800 \\div 8 = 100\\,\\Rightarrow\\,200 \\times 3 = 600\\,\\Rightarrow\\,100 + 600 = 700",
+        answer: 700
+    },
+    {
+        problem: "$$(600 + 200) \\div 10 \\times 4$$",
+        explanation: "600 + 200 = 800\\,\\Rightarrow\\,800 \\div 10 = 80\\,\\Rightarrow\\,80 \\times 4 = 320",
+        answer: 320
+    },
+    {
+        problem: "$$500 \\div (50 \\div 5) + 100$$",
+        explanation: "50 \\div 5 = 10\\,\\Rightarrow\\,500 \\div 10 = 50\\,\\Rightarrow\\,50 + 100 = 150",
+        answer: 150
+    },
+    {
+        problem: "$$(350 + 150) \\times 2 - 200 \\div 4$$",
+        explanation: "350 + 150 = 500\\,\\Rightarrow\\,500 \\times 2 = 1000\\,\\Rightarrow\\,200 \\div 4 = 50\\,\\Rightarrow\\,1000 - 50 = 950",
+        answer: 950
+    },
+    {
+        problem: "$$600 \\div 5 + 300 \\times 2$$",
+        explanation: "600 \\div 5 = 120\\,\\Rightarrow\\,300 \\times 2 = 600\\,\\Rightarrow\\,120 + 600 = 720",
+        answer: 720
+    },
+    {
+        problem: "$$(800 - 200) \\div 4 + 100$$",
+        explanation: "800 - 200 = 600\\,\\Rightarrow\\,600 \\div 4 = 150\\,\\Rightarrow\\,150 + 100 = 250",
+        answer: 250
+    },
+    {
+        problem: "$$200 \\times 5 - 600 \\div 12$$",
+        explanation: "200 \\times 5 = 1000\\,\\Rightarrow\\,600 \\div 12 = 50\\,\\Rightarrow\\,1000 - 50 = 950",
+        answer: 950
+    },
+    {
+        problem: "$$(500 + 300) \\div 20 \\times 5$$",
+        explanation: "500 + 300 = 800\\,\\Rightarrow\\,800 \\div 20 = 40\\,\\Rightarrow\\,40 \\times 5 = 200",
+        answer: 200
+    },
+    {
+        problem: "$$700 \\div (35 \\div 5) + 200$$",
+        explanation: "35 \\div 5 = 7\\,\\Rightarrow\\,700 \\div 7 = 100\\,\\Rightarrow\\,100 + 200 = 300",
+        answer: 300
+    },
+    {
+        problem: "$$(600 - 200) \\times 2 + 400 \\div 8$$",
+        explanation: "600 - 200 = 400\\,\\Rightarrow\\,400 \\times 2 = 800\\,\\Rightarrow\\,400 \\div 8 = 50\\,\\Rightarrow\\,800 + 50 = 850",
+        answer: 850
+    },
+    {
+        problem: "$$800 \\div 16 + 250 \\times 2$$",
+        explanation: "800 \\div 16 = 50\\,\\Rightarrow\\,250 \\times 2 = 500\\,\\Rightarrow\\,50 + 500 = 550",
+        answer: 550
+    },
+    {
+        problem: "$$(700 + 300) \\div 10 \\times 6$$",
+        explanation: "700 + 300 = 1000\\,\\Rightarrow\\,1000 \\div 10 = 100\\,\\Rightarrow\\,100 \\times 6 = 600",
+        answer: 600
+    },
+    {
+        problem: "$$500 \\div (50 \\div 5) + 200$$",
+        explanation: "50 \\div 5 = 10\\,\\Rightarrow\\,500 \\div 10 = 50\\,\\Rightarrow\\,50 + 200 = 250",
+        answer: 250
+    }
+];
+
+var totalProblems = problems.length;
+var currentProblemIndex = 0;
+var score = 0;
+var lives = 3;
+var difficulty = null;
+var baseTime = 0; // 문제당 시작 시간
+var pointsPerCorrect = 0;
+var timer = null; // 전체 게임 타이머
+var totalTime = 0; 
+var questionTime = 0; 
+var energyTimer = null;
+var energyWidth = 100;
+var timeRunning = false;
+var timeLimit = 0; // 각 문제 제한 시간(초)
+var infiniteMode = false; // 50문제 끝난 후 무한 모드
+var noTimeLimit = false; // 하(시간제한 없음) 모드 여부
+
+// 난이도 설정
+document.querySelectorAll('.difficulty-select button').forEach(function(btn){
+    btn.addEventListener('click', function(){
+        var diff = this.getAttribute('data-diff');
+        if(diff === 'top') {
+            timeLimit = 20;
+            pointsPerCorrect = 20;
+        } else if(diff === 'high') {
+            timeLimit = 30;
+            pointsPerCorrect = 15;
+        } else if(diff === 'mid') {
+            timeLimit = 40;
+            pointsPerCorrect = 13;
+        } else if(diff === 'low') {
+            timeLimit = 0; 
+            pointsPerCorrect = 10;
+            noTimeLimit = true;
+        }
+        difficulty = diff;
+        startGame();
+    });
+});
+
+function startGame(){
+    document.querySelector('.difficulty-select').style.display = 'none';
+    document.getElementById('quiz-container').style.display = 'block';
+    // 전체 타이머 시작
+    timer = setInterval(function(){
+        totalTime++;
+        document.getElementById('global-timer').textContent = totalTime;
+    },1000);
+
+    loadProblem();
+}
+
+// 문제 불러오기
+function loadProblem(){
+    if(lives <= 0) {
+        endGame();
+        return;
+    }
+
+    if(currentProblemIndex >= totalProblems) {
+        // 모든 문제를 다 풀었으니 이제부터는 무한 랜덤 모드
+        infiniteMode = true;
+    }
+
+    var pObj = infiniteMode ? problems[Math.floor(Math.random()*totalProblems)] : problems[currentProblemIndex];
+    document.getElementById('problem').innerHTML = pObj.problem;
+    document.getElementById('answer').value = '';
+    MathJax.typesetPromise(); // 수식 렌더
+
+    if(!noTimeLimit && timeLimit > 0){
+        startEnergyBar();
+    } else {
+        // 시간 제한 없음
+        document.getElementById('energy-bar-container').style.display = 'none';
+    }
+
+}
+
+// 에너지바 시작
+function startEnergyBar(){
+    document.getElementById('energy-bar-container').style.display = 'inline-block';
+    energyWidth = 100;
+    if(energyTimer) clearInterval(energyTimer);
+    energyTimer = setInterval(function(){
+        energyWidth -= (100/(timeLimit*2)); 
+        // 100/(timeLimit*2) -> 0.5초 단위 감소량(2회=1초)
+        // 0.5초마다 한번씩 감소
+        // 실제 1초당 energyWidth에서 100/timeLimit씩 줄어들게 하려면
+        // 1초에 2번 줄이므로 half step 계산
+    },500);
+
+    // 화면 갱신
+    animateEnergyBar();
+}
+
+function animateEnergyBar(){
+    var interval = setInterval(function(){
+        if(noTimeLimit){
+            clearInterval(interval);
+            return;
+        }
+        if(energyWidth <= 0){
+            clearInterval(interval);
+            clearInterval(energyTimer);
+            timeOut();
+        }
+        document.getElementById('energy-bar').style.width = energyWidth + '%';
+    },500);
+}
+
+// 시간초과 처리
+function timeOut(){
+    // 기회 1 감소
+    lives--;
+    updateLives();
+    // 다음 문제
+    nextQuestion();
+}
+
+// 정답 제출
+document.getElementById('submit-answer').addEventListener('click', checkAnswer);
+document.getElementById('answer').addEventListener('keyup', function(e){
+    if(e.key === 'Enter') {
+        checkAnswer();
+    }
+});
+
+function checkAnswer(){
+    var pObj = infiniteMode ? currentInfiniteProblemObject() : problems[currentProblemIndex];
+    var userAns = parseInt(document.getElementById('answer').value,10);
+
+    // 정답확인
+    if(userAns === pObj.answer) {
+        // 정답
+        score += pointsPerCorrect;
+        document.getElementById('score').textContent = score;
+        // 랜덤 보상 팝업
+        showRandomReward();
+        nextQuestion();
+    } else {
+        // 오답
+        lives--;
+        updateLives();
+        showExplanationPopup(pObj);
+    }
+}
+
+function currentInfiniteProblemObject(){
+    // 무한모드에서는 마지막으로 렌더한 문제를 가져오기 위해 재계산 필요
+    // 하지만 여기서는 그냥 problems에서 index가 아니고,
+    // 문제 로드시 pObj를 전역에 저장하는 식으로 바꾸자.
+    return currentProblem; 
+}
+
+var currentProblem = null; // 무한모드에서도 현재 문제 추적
+function loadProblem(){
+    if(lives <= 0) {
+        endGame();
+        return;
+    }
+
+    var pObj;
+    if(infiniteMode) {
+        pObj = problems[Math.floor(Math.random()*totalProblems)];
+    } else {
+        pObj = problems[currentProblemIndex];
+    }
+    currentProblem = pObj;
+
+    document.getElementById('problem').innerHTML = pObj.problem;
+    document.getElementById('answer').value = '';
+    MathJax.typesetPromise(); 
+
+    if(!noTimeLimit && timeLimit > 0){
+        document.getElementById('energy-bar-container').style.display = 'inline-block';
+        startEnergyBar();
+    } else {
+        // 시간 제한 없음
+        document.getElementById('energy-bar-container').style.display = 'none';
+    }
+}
+
+function nextQuestion(){
+    if(!noTimeLimit && timeLimit > 0){
+        clearInterval(energyTimer);
+    }
+    if(!infiniteMode){
+        currentProblemIndex++;
+        if(currentProblemIndex >= totalProblems) {
+            infiniteMode = true;
+        }
+    }
+    loadProblem();
+}
+
+function updateLives(){
+    document.getElementById('lives').textContent = lives;
+    if(lives <= 0) {
+        endGame();
+    }
+}
+
+function endGame(){
+    clearInterval(timer);
+    clearInterval(energyTimer);
+    alert("게임 종료! 점수: " + score);
+    location.reload();
+}
+
+// 해설 팝업 표시(오답시)
+function showExplanationPopup(pObj){
+    document.getElementById('explanation-content').innerHTML = "$$" + pObj.explanation + "$$<br><br>정답: " + pObj.answer;
+    MathJax.typesetPromise();
+    document.getElementById('explanation-popup-bg').style.display = 'flex';
+}
+
+document.getElementById('close-popup').addEventListener('click', function(){
+    document.getElementById('explanation-popup-bg').style.display = 'none';
+    // 다음문제로
+    nextQuestion();
+});
+
+// 랜덤 보상 팝업
+function showRandomReward(){
+    var r = Math.random();
+    // 1/10000 = 0.0001
+    // 1/1000 = 0.001
+    // 1/500 = 0.002
+    // 순서대로 체크
+    // 0.0001: 5000원 상품권
+    // 0.001 이후: 3000원 상품권
+    // 0.0031까지: 1회 면제권
+    // 즉,
+    // r<0.0001 -> 5000원 상품권
+    // else if(r<0.0011) -> 3000원 상품권 (0.001까지면 10/10000 확률이지만 문제 요구 그대로 엄격히 1/1000=0.001이면 약간 조정)
+    // else if(r<0.0031) -> 1회 면제권
+    if(r < 0.0001) {
+        displayReward("5000원 상품권 당첨!", "축하합니다! 5000원 상품권에 당첨되었습니다!");
+    } else if(r < 0.0011) {
+        displayReward("3000원 상품권 당첨!", "축하합니다! 3000원 상품권에 당첨되었습니다!");
+    } else if(r < 0.0031) {
+        displayReward("1회 면제권 당첨!", "축하합니다! 문제 1회 틀려도 기회 차감 없어요!");
+        // 1회 면제권 로직: 다음 번 틀릴 때 lives 차감 안하도록 구현 가능
+        // 여기서는 면제권 사용시 lives 차감 회피를 위해 flag 추가
+        freePassCount++;
+    }
+}
+
+var freePassCount = 0;
+function displayReward(title, message) {
+    document.getElementById('reward-title').textContent = title;
+    document.getElementById('reward-message').textContent = message;
+    document.getElementById('reward-popup').style.display = 'block';
+}
+
+document.getElementById('reward-close').addEventListener('click', function(){
+    document.getElementById('reward-popup').style.display = 'none';
+});
+
+// 오답 시 라이프 차감할 때 면제권 확인
+var originalUpdateLives = updateLives;
+updateLives = function(){
+    if(lives > 0) {
+        if(lives !== parseInt(document.getElementById('lives').textContent,10)) {
+            // lives 감소 상황
+            if(freePassCount > 0) {
+                // 면제권 사용
+                freePassCount--;
+                // lives를 원래대로 복구
+                lives++;
+            }
+        }
+    }
+    document.getElementById('lives').textContent = lives;
+    if(lives <= 0) {
+        endGame();
+    }
+}
+</script>
+</body>
+</html>
